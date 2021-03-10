@@ -1,0 +1,103 @@
+---
+title: "Slope model"
+author: "Nicolás Molano Gonzalez"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  bookdown::html_document2: default
+bibliography: references.bib  
+---
+
+```{r echo=F, message = FALSE, warning =F}
+library(pacman)
+p_load(tidyverse)
+p_load(kableExtra)
+p_load(knitr)
+p_load(latex2exp)   
+p_load(ggrepel)
+p_load(magick)
+p_load(reshape2)
+set.seed(150)
+```
+
+# Introducción
+
+In this document I will explore a situation when the slope of line is dependent on other variables.
+
+Assume that we have data about some beetle species, which consist of the age in days and the length of the body in millimeters. We also have measured the sex of the beetles. The idea is that the relation between Age and length is different between sexes. Next we simulate the data for this scenario:
+
+```{r }
+set.seed(333)
+n<-250
+
+Sex<-sample(c("F","M"),n,replace = T)
+Age<-runif(n,18,100)
+z1<-data.frame(Sex=factor(Sex),Age,mm_1=NA,mm_2=NA)
+
+z1[z1$Sex %in% "F","mm_1"]<-77+1.2*z1[z1$Sex %in% "F","Age"]+rnorm(nrow(z1[z1$Sex %in% "F",]),0,sd=70)
+z1[z1$Sex %in% "M","mm_1"]<-77+30+1.2*z1[z1$Sex %in% "M","Age"]+rnorm(nrow(z1[z1$Sex %in% "M",]),0,sd=70)
+
+z1[z1$Sex %in% "F","mm_2"]<-77+1.2*z1[z1$Sex %in% "F","Age"]+rnorm(nrow(z1[z1$Sex %in% "F",]),0,sd=70)
+z1[z1$Sex %in% "M","mm_2"]<-77+18+(1.2+6.6)*z1[z1$Sex %in% "M","Age"]+rnorm(nrow(z1[z1$Sex %in% "M",]),0,sd=70)
+
+p1<-z1 %>% ggplot(aes(x=Age,y=mm_1,color=Sex))+geom_point()+theme_bw()+labs(title="Case 1")
+p2<-z1 %>% ggplot(aes(x=Age,y=mm_2,color=Sex))+geom_point()+theme_bw()+labs(title="Case 2")
+
+
+```
+<center>
+```{r coag, echo=F, fig.width=8, fig.height=3.2,fig.cap="scatterplots of Age vs length (in mm) and sex of beetles."}
+gridExtra::grid.arrange(grobs =list(p1,p2),nrow=1,ncol=2)
+```
+</center>
+
+We can formulate a linear model for this scenario as follows:
+
+\begin{equation}
+E(mm|Age=x_1, I_M=x_2)= \beta_0+\beta_1x_1+\beta_2x_2+\beta_3(x_1 x_2)(\#eq:mode1)
+\end{equation}
+
+Where $I_M$ is an indicator variable for sex $M$, that is $I_M=0$ for female beetles and $I_M=1$ for male beetles.
+
+Model \@ref(eq:mode1) is very special since it is actually specifying two simple linear regressions: Age vs mm for the two sexes available. Let us verify this by evaluating model \@ref(eq:mode1) for each sex.
+
+For female beetles model \@ref(eq:mode1) results in 
+
+\begin{equation}
+E(mm|Age=x_1, I_M=0)= \beta_0+\beta_1x_1+\beta_2 \times 0 + \beta_3(x_1 \times 0)= \beta_0+\beta_1x_1(\#eq:mode1F)
+\end{equation}
+
+So $\beta_0$ is the intercept and $\beta_1$ is the slope of $Age$ vs $mm$ for female beetles. Now let us check the model for male beetles:
+
+\begin{equation}
+E(mm|Age=x_1, I_M=1)= \beta_0+\beta_1x_1+\beta_2 \times 1 + \beta_3(x_1 \times 1)= (\beta_0+\beta_2)+(\beta_1+\beta_3)x_1 (\#eq:mode1M)
+\end{equation}
+
+In this case, the intercept and slope for male beetles is now $(\beta_0+\beta_2)$ and $(\beta_1+\beta_3)$ respectively. Thus $\beta_2$ can be considered as the difference of intercepts between sex male and female, and similarly, $\beta_3$ is the difference between slopes.
+
+Now it should be clear that model \@ref(eq:mode1) effectively is modeling two different lines for each beetle gender. In particular a different slope for each gender.
+
+Let us now explore how to fit such a model in R:
+
+For case 1:
+```{r , echo=F}
+lm_btl_C1<-lm(mm_1~Age*Sex,data=z1)
+summary(lm_btl_C1)
+```
+
+And for case 2:
+```{r , echo=F}
+lm_btl_C2<-lm(mm_2~Age*Sex,data=z1)
+summary(lm_btl_C2)
+```
+
+As intended (you can verify this checking how the data for `mm_1` and `mm_2` was simulated) in case 1 the only difference is in intercepts (slopes are not significantly different, parameter `Age:SexM` is not significant) whereas for case 2 slopes are significantly different (parameter `Age:SexM` is significant).
+
+# Slope influenced by a numeric variable
+
+The above example illustrated how a categorical variable can be used to influence the slope of the line describing the statistical association between two numeric variables. This scenario led me to think if this could be possible also for a numeric variable. That is, a numeric variable affecting the slope of the line describing the statistical association between two numeric variables. Some thing of the form
+
+\begin{equation}
+E(Y|X=x, Z=z)= \beta_0+(\beta_1+\beta_2z)x (\#eq:mod2)
+\end{equation}
+
+
