@@ -16,6 +16,7 @@ p_load(latex2exp)
 p_load(ggrepel)
 p_load(magick)
 p_load(reshape2)
+p_load(scatterplot3d)
 set.seed(150)
 ```
 
@@ -100,4 +101,98 @@ The above example illustrated how a categorical variable can be used to influenc
 E(Y|X=x, Z=z)= \beta_0+(\beta_1+\beta_2z)x (\#eq:mod2)
 \end{equation}
 
+Let us see how the mathematical model \@ref(eq:mod2) can be represented in a three dimensional space:
 
+<center>
+```{r slopedin, echo=F,warning =F, fig.width=5, fig.height=4, fig.cap="Graphic representation of model \\@ref(eq:mod2)"}
+slopegif <- image_read("slope1.gif") 
+slopegif
+```
+</center>
+
+Surface of figure \@ref(fig:slopedin) has the following parameters:
+
+\begin{equation}
+Y=-0.06599867+(0.0+1.5z)x (\#eq:modEX)
+\end{equation}
+
+Now we simulate some data following equation  \@ref(eq:modEX)
+
+```{r }
+n<-25
+z<-seq(-1,1,length.out = n)
+x<-seq(-1,1,length.out = n)
+z2<-expand_grid(x,z) %>% data.frame()
+
+slpe_coefs<-c(0,1.5)
+intrcp<--0.06599867
+z2$y<-intrcp+(slpe_coefs[1]+slpe_coefs[2]*z2$z)*z2$x+rnorm(nrow(z2),sd=0.1)
+summary(z2)
+```
+
+Next we present the 3d scatterplot of this data set
+
+<center>
+```{r z2scatter, echo=F,warning =F, fig.width=5, fig.height=4, fig.cap="Scatterplot of simulated data following model \\@ref(eq:modEX)"}
+scatterplot3d(z2, angle = 125)
+```
+</center>
+
+Now the challenge is how to specify this model appropriately in a linear regression model. First we may note that model \@ref(eq:mod2) can be rewritten as 
+
+\begin{equation}
+E(Y|X=x, Z=z)= \beta_0+\beta_1x+\beta_2zx (\#eq:mod2a)
+\end{equation}
+
+Let’s try to do this in the `lm` function
+
+```{r , echo=F}
+lm_z2<-lm(y~x+x*z,data=z2)
+summary(lm_z2)
+```
+
+we got an extra term associated to z variable which does not appears in model  \@ref(eq:mod2a), let’s try again
+
+```{r , echo=F}
+lm_z2<-lm(y~x+x*z-z,data=z2)
+summary(lm_z2)
+```
+
+It is a surprise that subtracting variables inside a formula in lm works in such a way. Finally we could do the same using the function `I()`:
+
+```{r , echo=F}
+lm_z2<-lm(y~x+I(x*z),data=z2)
+summary(lm_z2)
+```
+
+We can see that the estimation of the parameters is very close to the real values used to simulate the data as shown in equation \@ref(eq:modEX).
+
+# Conclusion
+
+Linear models are commonly specified as 
+
+\begin{equation}
+E(Y|X_1=x_1, X_2=x_2,...,X_p=x_p)= \beta_0+\beta_1x_1+\beta_2x_2+...+\beta_px_p (\#eq:lm)
+\end{equation}
+
+most of the time, $X_j$ variables are assumed to be unrelated, and one of the functional consequences of this kind of models is that the effect of the different covariates are independent (also called additive effect). Most of the time, there is one of the $X_j$ variables which is of principal interest for the researcher, and the other covariates are just included in the model in order to take in to account their effect on the outcome of interest. The inclusion of the other, secondary important covariates, in a linear model is intended to “adjust” for their effect and to obtain an “adjusted” or “corrected“ effect for the covariate of principal interest, $X_j$. However, this adjustment is only modifying the intercept component of the relation of $Y$ and $X_j$. However the slope component remains unaffected.
+
+With our proposal, we are also including a possible effect of a secondary covariate in the slope component of the relation between $Y$ and $X_j$.
+
+Therefore, we propose the following approach to analyze the relation of a covariate of interest, let us call it $X$ with an outcome of interest $Y$, and to study the possible modifier effects of other set of covariates, let us call them $Z_1,Z_2,…,Z_p$, on the relation between $X$ and $Y$. The model is as follows:
+
+\begin{equation}
+E(Y|X=x, Z_1=z_1,...,Z_p=z_p)= \beta_0+\beta_1x_1+\gamma_1z_1+...+\gamma_pz_p+\\
+(\alpha_1z_1+...+\alpha_pz_p)x (\#eq:fm)
+\end{equation}
+
+which can be rewritten as
+
+\begin{equation}
+E(Y|X=x, Z_1=z_1,...,Z_p=z_p)= (\beta_0+\gamma_1z_1+...+\gamma_pz_p)+\\
+(\beta_1+\alpha_1z_1+...+\alpha_pz_p)x (\#eq:fma)
+\end{equation}
+
+where $(\beta_0+\gamma_1z_1+...+\gamma_pz_p)$ is the intercept component of the linear relation between $X$ and $Y$, which depends on $Z_j$ covariates and $(\beta_1+\alpha_1z_1+...+\alpha_pz_p)$ is the slope component of the linear relation between $X$ and $Y$, also affected or modified by $Z_j$ covariates.
+
+Models \@ref(eq:fm) and \@ref(eq:fma) are linear in their parameters and the usual theory of linear models apply to their estimation. Just care is needed in the specification of this models and we show that it is possible to fit these models using the appropriate formulation in R
